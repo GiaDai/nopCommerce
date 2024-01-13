@@ -11,14 +11,17 @@ namespace Nop.Api.Controllers
         {
         "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
     };
+        private readonly IConfiguration _config;
         private readonly ICategoryService _categoryService;
         private readonly ILogger<WeatherForecastController> _logger;
 
         public WeatherForecastController(ILogger<WeatherForecastController> logger
+            , IConfiguration config
             , ICategoryService categoryService
             )
         {
             _logger = logger;
+            _config = config;
             _categoryService = categoryService;
         }
 
@@ -35,11 +38,17 @@ namespace Nop.Api.Controllers
             .ToArray();
         }
 
-        [HttpGet("GetCategory", Name = "GetCategory")]
-        public async Task<IActionResult> GetCategory()
+        [HttpGet("jwt", Name = "GetJwtConfig")]
+        public IActionResult GetJwtConfig()
         {
-            var homepageCategories = await _categoryService.GetAllCategoriesDisplayedOnHomepageAsync(true);
-            return Ok(homepageCategories);
+            return Ok(new
+            {
+                Issuer = "Nop.Api",
+                Audience = "Nop.Api",
+                Key = _config["JWTSettings:Key"],
+                AccessTokenExpiration = 60,
+                RefreshTokenExpiration = 60 * 24 * 7
+            });
         }
     }
 }
