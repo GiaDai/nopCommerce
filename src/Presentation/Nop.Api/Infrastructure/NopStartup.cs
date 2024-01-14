@@ -20,6 +20,7 @@ namespace Nop.Api.Infrastructure
             services.AddScoped<ICustomerModelFactory, CustomerModelFactory>();
             services.AddScoped<IAddressModelFactory, AddressModelFactory>();
             services.AddScoped<ICountryModelFactory, CountryModelFactory>();
+            services.AddScoped<IOrderModelFactory, OrderModelFactory>();
         }
     }
 }

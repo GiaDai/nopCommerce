@@ -1,10 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Reflection.Metadata;
 using System.Security.Claims;
 using System.Text;
-using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Nop.Api.Extensions;
@@ -32,7 +29,7 @@ namespace Nop.Api.Controllers
 {
     [Route("api/customer")]
     [ApiController]
-    public class CustomerController : ControllerBase
+    public class CustomerController : BaseApiController
     {
         #region Fields
         private readonly AddressSettings _addressSettings;
@@ -88,7 +85,7 @@ namespace Nop.Api.Controllers
             IWorkflowMessageService workflowMessageService,
             LocalizationSettings localizationSettings,
             TaxSettings taxSettings
-        )
+        ) : base(customerService)
         {
             _addressService = addressService;
             _addressSettings = addressSettings;
@@ -166,11 +163,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Info()
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
-
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
             var model = new CustomerInfoModel();
             model = await _customerModelFactory.PrepareCustomerInfoModelAsync(model, customer, false);
 
@@ -183,10 +178,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Info(CustomerInfoModel model)
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
                 return Challenge();
@@ -353,10 +347,10 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public virtual async Task<IActionResult> Addresses()
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
+
             if (!await _customerService.IsRegisteredAsync(customer))
                 return NotFound();
 
@@ -374,10 +368,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetAddressAdd()
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
                 return NotFound();
@@ -396,10 +389,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostAddressAdd([FromBody]CustomerAddressEditModel model)
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
                 return NotFound();
@@ -444,10 +436,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetAddressEdit(int addressId)
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
                 return NotFound();
@@ -474,10 +465,9 @@ namespace Nop.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostAddressEdit([FromBody]CustomerAddressEditModel model)
         {
-            string userId = User.FindFirst("uid")?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return BadRequest();
-            var customer = await _customerService.GetCustomerByIdAsync(Convert.ToInt32(userId));
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
                 return NotFound();
@@ -519,6 +509,34 @@ namespace Nop.Api.Controllers
                 overrideAttributesXml: customAttributes);
 
             return BadRequest(model);
+        }
+
+        [Authorize]
+        [HttpDelete("addressdelete")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> PostAddressDelete(int addressId)
+        {
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
+
+            if (!await _customerService.IsRegisteredAsync(customer))
+                return NotFound();
+
+            //find address (ensure that it belongs to the current customer)
+            var address = await _customerService.GetCustomerAddressAsync(customer.Id, addressId);
+            if (address != null)
+            {
+                await _customerService.RemoveCustomerAddressAsync(customer, address);
+                await _customerService.UpdateCustomerAsync(customer);
+                //now delete the address record
+                await _addressService.DeleteAddressAsync(address);
+                return Ok();
+            }
+
+            //redirect to the address list page
+            return NotFound();
         }
         #endregion
 
