@@ -1,4 +1,7 @@
-﻿using Autofac.Extensions.DependencyInjection;
+﻿using System.Text;
+using Autofac.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Nop.Api.Extensions;
 using Nop.Core.Configuration;
 using Nop.Core.Infrastructure;
@@ -35,13 +38,13 @@ else
         options.ValidateScopes = false;
         options.ValidateOnBuild = true;
     });
-
+_services.AddAuthenticationService(_config,_env);
 //add services to the application and configure service provider
 _services.ConfigureApplicationServices(builder);
 _services.AddJwtBererService(_config, _env);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 _services.AddEndpointsApiExplorer();
-_services.AddSwaggerGen();
+_services.AddSwaggerExtension();
 
 var app = builder.Build();
 //configure the application HTTP request pipeline
@@ -51,8 +54,7 @@ app.StartEngine();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerExtension();
 }
 
 app.UseHttpsRedirection();
