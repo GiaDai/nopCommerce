@@ -230,7 +230,7 @@ namespace Nop.Api.Controllers
 
         [Authorize]
         [HttpGet("info")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(CustomerInfoModel),StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Info()
         {

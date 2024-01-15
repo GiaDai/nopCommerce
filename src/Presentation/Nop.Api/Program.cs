@@ -41,7 +41,7 @@ _services.ConfigureApplicationServices(builder);
 _services.AddJwtBererService(_config, _env);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 _services.AddEndpointsApiExplorer();
-
+_services.AddCorsExtension();
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -58,5 +58,5 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.UseAuthentication();
 app.MapControllers();
-
+app.UseCrossOrigin();
 app.Run();

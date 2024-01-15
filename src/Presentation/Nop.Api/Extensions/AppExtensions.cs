@@ -7,5 +7,13 @@
             app.UseSwagger();
             app.UseSwaggerUI();
         }
+
+        public static void UseCrossOrigin(this IApplicationBuilder app)
+        {
+            app.UseCors(builder => builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+        }
     }
 }
