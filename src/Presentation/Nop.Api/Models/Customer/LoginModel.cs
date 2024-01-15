@@ -12,4 +12,14 @@ namespace Nop.Api.Models.Customer
         [NopResourceDisplayName("Account.Login.Fields.Password")]
         public string Password { get; set; }
     }
+
+    public class LoginResponseSuccess
+    {
+        public string Token { get; set; }
+    }
+
+    public class LoginResponseError
+    {
+        public string Message { get; set; }
+    }
 }

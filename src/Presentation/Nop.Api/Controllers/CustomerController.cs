@@ -120,16 +120,87 @@ namespace Nop.Api.Controllers
 
         #region Customer Login
 
+        /// <summary>
+        /// Customer Login
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// Sample request:
+        ///
+        ///     POST /api/customer/login
+        ///     {
+        ///        "username": "admin",
+        ///        "password": "123456"
+        ///     }
+        ///
+        /// </remarks>
         [HttpPost("login")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(LoginResponseSuccess), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(LoginResponseError), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Login(LoginModel model)
         {
             var loginResult = await _customerRegistrationService.ValidateCustomerAsync(model.Username?.Trim(), model.Password);
-            var customer = await _customerService.GetCustomerByEmailAsync(model.Username?.Trim());
-            await _customerRegistrationService.SignInCustomerAsync(customer, "/", true);
-            var tokenString = GenerateJSONWebToken(customer);
-            return Ok(new { token = tokenString });
+            switch (loginResult)
+            {
+            
+                case CustomerLoginResults.Successful:
+                    {
+                        var customer = await _customerService.GetCustomerByEmailAsync(model.Username?.Trim());
+                        await _customerRegistrationService.SignInCustomerAsync(customer, "/", true);
+                        var tokenString = GenerateJSONWebToken(customer);
+                        return Ok(new LoginResponseSuccess { Token = tokenString });
+                    }
+                case CustomerLoginResults.CustomerNotExist:
+                    {
+                        return BadRequest(new LoginResponseError { 
+                            Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.CustomerNotExist") 
+                        });
+                    }
+                case CustomerLoginResults.Deleted:
+                    {
+                        return BadRequest(
+                            new LoginResponseError { 
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.Deleted")
+                            });
+                    }
+                case CustomerLoginResults.NotActive:
+                    {
+                        return BadRequest(
+                            new LoginResponseError {
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.NotActive") 
+                            });
+                    }
+                case CustomerLoginResults.NotRegistered:
+                    {
+                        return BadRequest(
+                            new LoginResponseError {
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.NotRegistered") 
+                            
+                            });
+                    }
+                case CustomerLoginResults.WrongPassword:
+                    {
+                        return BadRequest(
+                            new LoginResponseError
+                            {
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.WrongPassword") 
+                            });
+                    }
+                case CustomerLoginResults.LockedOut:
+                    return BadRequest(new LoginResponseError { 
+                        Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.LockedOut") 
+                    });
+                default:
+                    {
+                        return BadRequest(
+                            new LoginResponseError
+                            {
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.UnknownError") 
+                            });
+                    }
+            }
+            
         }
 
         private string GenerateJSONWebToken(Customer userInfo)
@@ -147,7 +218,7 @@ namespace Nop.Api.Controllers
               _config["JWTSettings:Issuer"],
               _config["JWTSettings:Issuer"],
               claims: claims,
-              expires: DateTime.Now.AddMinutes(120),
+              expires: DateTime.Now.AddMinutes(int.Parse(_config["JWTSettings:DurationInMinutes"])),
               signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
