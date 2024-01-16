@@ -55,6 +55,7 @@ namespace Nop.Api.Controllers
         private readonly ILocalizationService _localizationService;
         private readonly INewsLetterSubscriptionService _newsLetterSubscriptionService;
         private readonly INotificationService _notificationService;
+        private readonly IProductModelFactory _productModelFactory;
         private readonly IStoreContext _storeContext;
         private readonly ITaxService _taxService;
         private readonly IWorkContext _workContext;
@@ -86,6 +87,7 @@ namespace Nop.Api.Controllers
             ILocalizationService localizationService,
             INewsLetterSubscriptionService newsLetterSubscriptionService,
             INotificationService notificationService,
+            IProductModelFactory productModelFactory,
             IStoreContext storeContext,
             ITaxService taxService,
             IWorkContext workContext,
@@ -114,6 +116,7 @@ namespace Nop.Api.Controllers
             _localizationService = localizationService;
             _newsLetterSubscriptionService = newsLetterSubscriptionService;
             _notificationService = notificationService;
+            _productModelFactory = productModelFactory;
             _storeContext = storeContext;
             _taxService = taxService;
             _workContext = workContext;
@@ -751,7 +754,7 @@ namespace Nop.Api.Controllers
             {
                 return Challenge();
             }
-            var model = await _productModelFactory.PrepareCustomerProductReviewsModelAsync(pageNumber);
+            var model = await _productModelFactory.PrepareCustomerProductReviewsModelAsync(customer,pageNumber);
 
             return Ok(model);
         }
