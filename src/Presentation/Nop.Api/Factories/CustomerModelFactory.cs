@@ -99,6 +99,7 @@ namespace Nop.Api.Factories
 
         }
 
+        
 
 
         #endregion
@@ -325,6 +326,20 @@ namespace Nop.Api.Factories
             }
 
             return model;
+        }
+
+        /// <summary>
+        /// Prepare the change password model
+        /// </summary>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the change password model
+        /// </returns>
+        public virtual Task<ChangePasswordModel> PrepareChangePasswordModelAsync()
+        {
+            var model = new ChangePasswordModel();
+
+            return Task.FromResult(model);
         }
 
         #endregion

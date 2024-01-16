@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Nop.Api.Extensions;
 using Nop.Api.Factories;
+using Nop.Api.Models.Catalog;
 using Nop.Api.Models.Customer;
 using Nop.Core;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Forums;
@@ -35,6 +37,7 @@ namespace Nop.Api.Controllers
     {
         #region Fields
         private readonly AddressSettings _addressSettings;
+        private readonly CatalogSettings _catalogSettings;
         private readonly CustomerSettings _customerSettings;
         private readonly DateTimeSettings _dateTimeSettings;
         private readonly ForumSettings _forumSettings;
@@ -66,6 +69,7 @@ namespace Nop.Api.Controllers
         public CustomerController(
             IAddressService addressService,
             AddressSettings addressSettings,
+            CatalogSettings catalogSettings,
             CustomerSettings customerSettings,
             DateTimeSettings dateTimeSettings,
             ForumSettings forumSettings,
@@ -93,6 +97,7 @@ namespace Nop.Api.Controllers
         {
             _addressService = addressService;
             _addressSettings = addressSettings;
+            _catalogSettings = catalogSettings;
             _customerSettings = customerSettings;
             _dateTimeSettings = dateTimeSettings;
             _forumSettings = forumSettings;
@@ -448,6 +453,7 @@ namespace Nop.Api.Controllers
         /// Get Customer list address
         /// </summary>
         /// <returns></returns>
+        
         [HttpGet("addresses")]
         [ProducesResponseType(typeof(CustomerAddressListModel),StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -649,6 +655,106 @@ namespace Nop.Api.Controllers
             return NotFound();
         }
 
+        /// <summary>
+        /// Change Password Customer
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("changepassword")]
+        [ProducesResponseType(typeof(ChangePasswordModel),StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetChangePassword()
+        {
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
+
+            var model = await _customerModelFactory.PrepareChangePasswordModelAsync();
+
+            //display the cause of the change password 
+            if (await _customerService.IsPasswordExpiredAsync(customer))
+                return BadRequest(await _localizationService.GetResourceAsync("Account.ChangePassword.PasswordIsExpired"));
+
+            return Ok(model);
+        }
+
+        /// <summary>
+        /// Change Password Customer
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// Sample request:
+        ///
+        ///     POST /api/v1/customer/changepassword
+        ///     {
+        ///        "oldPassword": "123456",
+        ///        "newPassword": "789456",
+        ///        "confirmNewPassword": "789456"
+        ///     }
+        ///
+        /// </remarks>
+        [HttpPost("changepassword")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(List<string>),StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> PostChangePassword(ChangePasswordModel model)
+        {
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
+
+            if (!await _customerService.IsRegisteredAsync(customer))
+                return Challenge();
+            ChangePasswordError changePasswordError = new ChangePasswordError()
+            {
+                Errors = new List<string>()
+            };
+            if (ModelState.IsValid)
+            {
+                if (model.NewPassword != model.ConfirmNewPassword)
+                {
+                    changePasswordError.Errors.Add(await _localizationService.GetResourceAsync("Account.ChangePassword.Fields.NewPasswordAndConfirmNewPasswordMustMatch"));
+                    return BadRequest(changePasswordError);
+                }
+                var changePasswordRequest = new ChangePasswordRequest(customer.Email,
+                    true, _customerSettings.DefaultPasswordFormat, model.NewPassword, model.OldPassword);
+                var changePasswordResult = await _customerRegistrationService.ChangePasswordAsync(changePasswordRequest);
+                if (changePasswordResult.Success)
+                {
+                    _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Account.ChangePassword.PasswordHasBeenChanged"));
+                    return Ok();
+                }
+                else
+                {
+                    
+                    foreach (var error in changePasswordResult.Errors)
+                        changePasswordError.Errors.Add(error);
+                    
+                }
+            }
+            return BadRequest(changePasswordError);
+        }
+
+        [HttpGet("productreviews")]
+        [ProducesResponseType(typeof(CustomerProductReviewsModel),StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetProductReviews(int? pageNumber)
+        {
+            var customer = await GetCustomer();
+            if (customer == null)
+                return Unauthorized();
+
+            if (!_catalogSettings.ShowProductReviewsTabOnAccountPage)
+            {
+                return Challenge();
+            }
+            var model = await _productModelFactory.PrepareCustomerProductReviewsModelAsync(pageNumber);
+
+            return Ok(model);
+        }
         #endregion
     }
 }

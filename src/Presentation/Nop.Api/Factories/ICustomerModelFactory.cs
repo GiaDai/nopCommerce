@@ -30,5 +30,13 @@ namespace Nop.Api.Factories
         /// The task result contains the customer address list model  
         /// </returns>
         Task<CustomerAddressListModel> PrepareCustomerAddressListModelAsync();
+        /// <summary>
+        /// Prepare the change password model
+        /// </summary>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the change password model
+        /// </returns>
+        Task<ChangePasswordModel> PrepareChangePasswordModelAsync();
     }
 }
