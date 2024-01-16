@@ -21,7 +21,7 @@ if (!string.IsNullOrEmpty(builder.Environment?.EnvironmentName))
 builder.Configuration.AddEnvironmentVariables();
 //load application settings
 _services.ConfigureApplicationSettings(builder);
-
+_services.AddApiVersioningExtension();
 var appSettings = Singleton<AppSettings>.Instance;
 var useAutofac = appSettings.Get<CommonConfig>().UseAutofac;
 

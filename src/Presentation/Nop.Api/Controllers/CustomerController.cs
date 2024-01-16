@@ -27,7 +27,9 @@ using Nop.Services.Tax;
 
 namespace Nop.Api.Controllers
 {
-    [Route("api/customer")]
+    [Authorize]
+    [ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/customer")]
     [ApiController]
     public class CustomerController : BaseApiController
     {
@@ -54,6 +56,7 @@ namespace Nop.Api.Controllers
         private readonly ITaxService _taxService;
         private readonly IWorkContext _workContext;
         private readonly IWorkflowMessageService _workflowMessageService;
+        private readonly IWebHostEnvironment _env;
         private readonly LocalizationSettings _localizationSettings;
         private readonly TaxSettings _taxSettings;
 
@@ -83,6 +86,7 @@ namespace Nop.Api.Controllers
             ITaxService taxService,
             IWorkContext workContext,
             IWorkflowMessageService workflowMessageService,
+            IWebHostEnvironment env,
             LocalizationSettings localizationSettings,
             TaxSettings taxSettings
         ) : base(customerService)
@@ -109,6 +113,7 @@ namespace Nop.Api.Controllers
             _taxService = taxService;
             _workContext = workContext;
             _workflowMessageService = workflowMessageService;
+            _env = env;
             _localizationSettings = localizationSettings;
             _taxSettings = taxSettings;
 
@@ -130,11 +135,13 @@ namespace Nop.Api.Controllers
         ///
         ///     POST /api/customer/login
         ///     {
-        ///        "username": "admin",
+        ///        "username": "victoria_victoria@nopCommerce.com",
         ///        "password": "123456"
         ///     }
         ///
         /// </remarks>
+
+        [AllowAnonymous]
         [HttpPost("login")]
         [ProducesResponseType(typeof(LoginResponseSuccess), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(LoginResponseError), StatusCodes.Status400BadRequest)]
@@ -184,7 +191,7 @@ namespace Nop.Api.Controllers
                         return BadRequest(
                             new LoginResponseError
                             {
-                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials.WrongPassword") 
+                                Message = await _localizationService.GetResourceAsync("Account.Login.WrongCredentials") 
                             });
                     }
                 case CustomerLoginResults.LockedOut:
@@ -205,7 +212,12 @@ namespace Nop.Api.Controllers
 
         private string GenerateJSONWebToken(Customer userInfo)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWTSettings:Key"]));
+            string? jWT_KEY = _env.IsProduction() ? Environment.GetEnvironmentVariable("JWT_KEY") : _config["JWTSettings:Key"];
+            string? vALID_AUDIENCE = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_AUDIENCE") : _config["JWTSettings:Audience"];
+            string? vALID_ISSUER = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_ISSUER") : _config["JWTSettings:Issuer"];
+            string? expiredTime = _env.IsProduction() ? Environment.GetEnvironmentVariable("EXPIRED_TIME") : _config["JWTSettings:DurationInMinutes"];
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jWT_KEY));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
             var claims = new[]
             {
@@ -215,10 +227,10 @@ namespace Nop.Api.Controllers
                 new Claim("uid", userInfo.Id.ToString())
             };
             var token = new JwtSecurityToken(
-              _config["JWTSettings:Issuer"],
-              _config["JWTSettings:Issuer"],
+              issuer: vALID_ISSUER,
+              audience: vALID_AUDIENCE,
               claims: claims,
-              expires: DateTime.Now.AddMinutes(int.Parse(_config["JWTSettings:DurationInMinutes"])),
+              expires: DateTime.Now.AddMinutes(int.Parse(expiredTime)),
               signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -228,9 +240,16 @@ namespace Nop.Api.Controllers
 
         #region Customer My Account/Info
 
-        [Authorize]
+        /// <summary>
+        /// Get Customer Info
+        /// </summary>
+        /// <returns></returns>
+        /// <remarks>
+        /// GET /api/customer/info
+        /// </remarks>
         [HttpGet("info")]
         [ProducesResponseType(typeof(CustomerInfoModel),StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Info()
         {
@@ -239,14 +258,29 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
             var model = new CustomerInfoModel();
             model = await _customerModelFactory.PrepareCustomerInfoModelAsync(model, customer, false);
-
+            if (model == null)
+                return BadRequest();
             return Ok(model);
         }
 
-        [Authorize]
+        /// <summary>
+        /// Update Customer Info
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        /// <remarks>
+        /// Simple request:
+        /// 
+        ///     POST /api/customer/info
+        ///     {
+        ///         "a":1
+        ///     }
+        /// </remarks>
         [HttpPost("info")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(CustomerInfoModel),StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Info(CustomerInfoModel model)
         {
             var customer = await GetCustomer();
@@ -395,7 +429,7 @@ namespace Nop.Api.Controllers
 
                     _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Account.CustomerInfo.Updated"));
 
-                    return RedirectToRoute("CustomerInfo");
+                    return Ok();
                 }
             }
             catch (Exception exc)
@@ -406,16 +440,19 @@ namespace Nop.Api.Controllers
             //If we got this far, something failed, redisplay form
             model = await _customerModelFactory.PrepareCustomerInfoModelAsync(model, customer, true, "");
 
-            return Ok(model);
+            return BadRequest(model);
         }
         #endregion
 
-        #region Customer My Account/Address
-
-        [Authorize]
+        /// <summary>
+        /// Get Customer list address
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("addresses")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(CustomerAddressListModel),StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public virtual async Task<IActionResult> Addresses()
         {
             var customer = await GetCustomer();
@@ -423,41 +460,24 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
-                return NotFound();
-
-            if (!await _customerService.IsRegisteredAsync(customer))
                 return Challenge();
 
             var model = await _customerModelFactory.PrepareCustomerAddressListModelAsync();
-
-            return Ok(model);
-        }
-
-        [Authorize]
-        [HttpGet("addressadd")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetAddressAdd()
-        {
-            var customer = await GetCustomer();
-            if (customer == null)
-                return Unauthorized();
-
-            if (!await _customerService.IsRegisteredAsync(customer))
+            if(model == null)
                 return NotFound();
-            var model = new CustomerAddressEditModel();
-            await _addressModelFactory.PrepareAddressModelAsync(model.Address,
-                address: null,
-            excludeProperties: false,
-                addressSettings: _addressSettings,
-                loadCountries: async () => await _countryService.GetAllCountriesAsync((await _workContext.GetWorkingLanguageAsync()).Id));
             return Ok(model);
         }
 
-        [Authorize]
+        /// <summary>
+        /// Create Customer Address
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
         [HttpPost("addressadd")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(CustomerAddressEditModel),StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostAddressAdd([FromBody]CustomerAddressEditModel model)
         {
             var customer = await GetCustomer();
@@ -465,7 +485,7 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
-                return NotFound();
+                return Challenge();
             //custom address attributes
             var customAttributes = "";
 
@@ -501,10 +521,16 @@ namespace Nop.Api.Controllers
             return BadRequest(model);
         }
 
-        [Authorize]
+        /// <summary>
+        /// Get Customer Address Edit
+        /// </summary>
+        /// <param name="addressId"></param>
+        /// <returns></returns>
         [HttpGet("addressedit")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(CustomerAddressEditModel),StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetAddressEdit(int addressId)
         {
             var customer = await GetCustomer();
@@ -512,7 +538,7 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
-                return NotFound();
+                return Challenge();
 
             //find address (ensure that it belongs to the current customer)
             var address = await _customerService.GetCustomerAddressAsync(customer.Id, addressId);
@@ -530,10 +556,17 @@ namespace Nop.Api.Controllers
             return Ok(model);
         }
 
-        [Authorize]
+        /// <summary>
+        /// Update Customer Address
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
         [HttpPost("addressedit")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(CustomerAddressEditModel),StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostAddressEdit([FromBody]CustomerAddressEditModel model)
         {
             var customer = await GetCustomer();
@@ -541,7 +574,7 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
-                return NotFound();
+                return Challenge();
 
             //find address (ensure that it belongs to the current customer)
             var address = await _customerService.GetCustomerAddressAsync(customer.Id, model.Address.Id);
@@ -567,7 +600,7 @@ namespace Nop.Api.Controllers
 
                 _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Account.CustomerAddresses.Updated"));
 
-                return Ok(200);
+                return Ok();
             }
 
             //If we got this far, something failed, redisplay form
@@ -582,10 +615,16 @@ namespace Nop.Api.Controllers
             return BadRequest(model);
         }
 
-        [Authorize]
+        /// <summary>
+        /// Delete Customer Address
+        /// </summary>
+        /// <param name="addressId"></param>
+        /// <returns></returns>
         [HttpDelete("addressdelete")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> PostAddressDelete(int addressId)
         {
             var customer = await GetCustomer();
@@ -593,7 +632,7 @@ namespace Nop.Api.Controllers
                 return Unauthorized();
 
             if (!await _customerService.IsRegisteredAsync(customer))
-                return NotFound();
+                return Challenge();
 
             //find address (ensure that it belongs to the current customer)
             var address = await _customerService.GetCustomerAddressAsync(customer.Id, addressId);
@@ -609,7 +648,6 @@ namespace Nop.Api.Controllers
             //redirect to the address list page
             return NotFound();
         }
-        #endregion
 
         #endregion
     }

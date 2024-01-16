@@ -2,7 +2,6 @@
 using System.Reflection;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -12,6 +11,9 @@ namespace Nop.Api.Extensions
     {
         public static void AddAuthenticationService(this IServiceCollection services, IConfiguration _config, IWebHostEnvironment _env)
         {
+            string? jWT_KEY = _env.IsProduction() ? Environment.GetEnvironmentVariable("JWT_KEY") : _config["JWTSettings:Key"];
+            string? vALID_AUDIENCE = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_AUDIENCE") : _config["JWTSettings:Audience"];
+            string? vALID_ISSUER = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_ISSUER") : _config["JWTSettings:Issuer"];
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -21,9 +23,9 @@ namespace Nop.Api.Extensions
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = _config["JWTSettings:Issuer"],
-                    ValidAudience = _config["JWTSettings:Issuer"],
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWTSettings:Key"]))
+                    ValidIssuer = vALID_ISSUER,
+                    ValidAudience = vALID_AUDIENCE,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jWT_KEY))
                 };
             });
         }
@@ -32,15 +34,15 @@ namespace Nop.Api.Extensions
             //IdentityServerConfig identityServerConfig = new IdentityServerConfig();
             //Configuration.Bind("IdentityServerConfig", identityServerConfig);
 
-            string JWT_KEY = _env.IsProduction() ? Environment.GetEnvironmentVariable("JWT_KEY") : _config["JWTSettings:Key"];
-            string VALID_AUDIENCE = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_AUDIENCE") : _config["JWTSettings:Audience"];
-            string VALID_ISSUER = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_ISSUER") : _config["JWTSettings:Issuer"];
+            string? jWT_KEY = _env.IsProduction() ? Environment.GetEnvironmentVariable("JWT_KEY") : _config["JWTSettings:Key"];
+            string? vALID_AUDIENCE = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_AUDIENCE") : _config["JWTSettings:Audience"];
+            string? vALID_ISSUER = _env.IsProduction() ? Environment.GetEnvironmentVariable("VALID_ISSUER") : _config["JWTSettings:Issuer"];
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddJwtBearer(JWT_KEY, o =>
+            .AddJwtBearer(jWT_KEY, o =>
             {
                 o.RequireHttpsMetadata = false;
                 o.SaveToken = false;
@@ -51,9 +53,9 @@ namespace Nop.Api.Extensions
                     ValidateAudience = false,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero,
-                    ValidIssuer = VALID_ISSUER,
-                    ValidAudience = VALID_AUDIENCE,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JWT_KEY))
+                    ValidIssuer = vALID_ISSUER,
+                    ValidAudience = vALID_AUDIENCE,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jWT_KEY))
                 };
             });
         }
@@ -65,18 +67,18 @@ namespace Nop.Api.Extensions
                 c.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Version = "v1",
-                    Title = "ToDo API",
-                    Description = "An ASP.NET Core Web API for managing ToDo items",
-                    TermsOfService = new Uri("https://example.com/terms"),
+                    Title = "NopCommerce Wallet",
+                    Description = "An ASP.NET Core Web API for managing NopCommerce Wallet items",
+                    TermsOfService = new Uri("https://nop-wallet.com/terms"),
                     Contact = new OpenApiContact
                     {
-                        Name = "Example Contact",
-                        Url = new Uri("https://example.com/contact")
+                        Name = "Nop Wallet Contact",
+                        Url = new Uri("https://nop-wallet.com/contact")
                     },
                     License = new OpenApiLicense
                     {
-                        Name = "Example License",
-                        Url = new Uri("https://example.com/license")
+                        Name = "Nop Wallet License",
+                        Url = new Uri("https://nop-wallet.com/license")
                     }
                 });
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -120,6 +122,19 @@ namespace Nop.Api.Extensions
                            .AllowAnyMethod()
                            .AllowAnyHeader();
                 });
+            });
+        }
+
+        public static void AddApiVersioningExtension(this IServiceCollection services)
+        {
+            services.AddApiVersioning(config =>
+            {
+                // Specify the default API Version as 1.0
+                config.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
+                // If the client hasn't specified the API version in the request, use the default API version number 
+                config.AssumeDefaultVersionWhenUnspecified = true;
+                // Advertise the API versions supported for the particular endpoint
+                config.ReportApiVersions = true;
             });
         }
     }
