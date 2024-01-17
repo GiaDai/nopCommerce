@@ -144,7 +144,7 @@ namespace Nop.Api.Controllers
         ///     POST /api/customer/login
         ///     {
         ///        "username": "victoria_victoria@nopCommerce.com",
-        ///        "password": "123456"
+        ///        "password": "362348"
         ///     }
         ///
         /// </remarks>
@@ -740,6 +740,11 @@ namespace Nop.Api.Controllers
             return BadRequest(changePasswordError);
         }
 
+        /// <summary>
+        /// Get product reviews by customer
+        /// </summary>
+        /// <param name="pageNumber"></param>
+        /// <returns></returns>
         [HttpGet("productreviews")]
         [ProducesResponseType(typeof(CustomerProductReviewsModel),StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

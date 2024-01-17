@@ -22,6 +22,21 @@ namespace Nop.Api.Infrastructure
             services.AddScoped<ICountryModelFactory, CountryModelFactory>();
             services.AddScoped<IOrderModelFactory, OrderModelFactory>();
             services.AddScoped<IProductModelFactory, ProductModelFactory>();
+            services.AddScoped<IShoppingCartModelFactory, ShoppingCartModelFactory>();
+            services.AddScoped<ICatalogModelFactory, CatalogModelFactory>();
+            services.AddScoped<IBlogModelFactory, BlogModelFactory>();
+            services.AddScoped<ICheckoutModelFactory, CheckoutModelFactory>();
+            services.AddScoped<ICommonModelFactory, CommonModelFactory>();
+            services.AddScoped<IForumModelFactory, ForumModelFactory>();
+            services.AddScoped<INewsletterModelFactory, NewsletterModelFactory>();
+            services.AddScoped<INewsModelFactory, NewsModelFactory>();
+            services.AddScoped<IPollModelFactory, PollModelFactory>();
+            services.AddScoped<IPrivateMessagesModelFactory, PrivateMessagesModelFactory>();
+            services.AddScoped<IProfileModelFactory, ProfileModelFactory>();
+            services.AddScoped<IReturnRequestModelFactory, ReturnRequestModelFactory>();
+            services.AddScoped<ISitemapModelFactory, SitemapModelFactory>();
+            services.AddScoped<ISitemapModelFactory, SitemapModelFactory>();
+            services.AddScoped<IVendorModelFactory, VendorModelFactory>();
         }
     }
 }
